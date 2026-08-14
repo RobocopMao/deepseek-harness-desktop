@@ -114,12 +114,19 @@ fn is_repo_root(path: &Path) -> bool {
     path.join("pnpm-workspace.yaml").is_file()
 }
 
-/// Walks up from `start` (at most 8 levels) to the checkout root.
+/// Walks up from `start` (at most 8 levels); at each level checks the
+/// directory itself and a `deepseek-harness` sibling, so a client living
+/// next to the checkout (for example `~/projects/deepseek-harness-desktop`)
+/// still finds it.
 fn walk_up_to_repo(start: &Path) -> Option<PathBuf> {
     let mut current = start.to_path_buf();
     for _ in 0..8 {
         if is_repo_root(&current) {
             return Some(current);
+        }
+        let sibling = current.join("deepseek-harness");
+        if is_repo_root(&sibling) {
+            return Some(sibling);
         }
         current = current.parent()?.to_path_buf();
     }
@@ -432,39 +439,43 @@ mod tests {
         assert!(resolve_program("definitely-not-a-real-command-xyz").is_none());
     }
 
-    #[test]
-    fn resolve_repo_dir_walks_up_to_the_checkout() {
-        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let repo_root = manifest
-            .parent()
-            .expect("dsh-desktop has a parent")
-            .parent()
-            .expect("rust has a parent")
-            .to_path_buf();
-        let probe_dir = manifest.join("src");
-        unsafe { std::env::remove_var("DSH_REPO_DIR") };
-        std::env::set_current_dir(&probe_dir).expect("crate src must be accessible");
-        let resolved = resolve_repo_dir().expect("repo root must be found by walking up");
-        assert_eq!(resolved, repo_root);
+    /// Builds a fabricated layout under the crate dir: a fake harness
+    /// checkout (`deepseek-harness`) and a standalone client next to it,
+    /// mirroring how this repo lives beside the official checkout. Returns
+    /// the checkout and the client's src dir.
+    fn make_fake_layout(manifest: &Path) -> (PathBuf, PathBuf) {
+        let layout = manifest.join(".tmp-layout");
+        let checkout = layout.join("deepseek-harness");
+        let client_src = layout.join("client-standalone").join("src");
+        std::fs::create_dir_all(&checkout).expect("fake checkout must be creatable");
+        std::fs::create_dir_all(&client_src).expect("fake client must be creatable");
+        std::fs::write(checkout.join("pnpm-workspace.yaml"), "").expect("marker must be writable");
+        (checkout, client_src)
     }
 
     #[test]
-    fn repo_root_detection_and_env_override() {
+    fn repo_detection_uses_env_then_walk_with_sibling_check() {
         let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let repo_root = manifest
-            .parent()
-            .expect("dsh-desktop has a parent")
-            .parent()
-            .expect("rust has a parent")
-            .to_path_buf();
-        assert!(is_repo_root(&repo_root));
+        let (checkout, client_src) = make_fake_layout(&manifest);
+
+        assert!(is_repo_root(&checkout));
         assert!(!is_repo_root(&manifest));
+        // Walking up from inside the checkout finds the checkout itself.
+        assert_eq!(walk_up_to_repo(&checkout.join("packages").join("x")), Some(checkout.clone()));
+        // Walking up from a standalone client finds the sibling checkout.
+        assert_eq!(walk_up_to_repo(&client_src), Some(checkout.clone()));
+
+        std::env::set_current_dir(&client_src).expect("fake client src must be accessible");
+        // A non-root DSH_REPO_DIR is rejected, and the cwd walk finds the
+        // sibling checkout.
         unsafe { std::env::set_var("DSH_REPO_DIR", manifest.as_os_str()) };
-        // A non-root DSH_REPO_DIR is rejected, and the cwd walk-up still
-        // resolves the real checkout.
-        std::env::set_current_dir(&manifest).expect("crate dir must be accessible");
-        assert_eq!(resolve_repo_dir(), Some(repo_root));
+        assert_eq!(resolve_repo_dir(), Some(checkout.clone()));
+        // A valid DSH_REPO_DIR wins directly.
+        unsafe { std::env::set_var("DSH_REPO_DIR", checkout.as_os_str()) };
+        assert_eq!(resolve_repo_dir(), Some(checkout.clone()));
         unsafe { std::env::remove_var("DSH_REPO_DIR") };
+
+        std::fs::remove_dir_all(manifest.join(".tmp-layout")).expect("fake layout must be removable");
     }
 
     #[test]
