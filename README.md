@@ -124,7 +124,7 @@ rust/
   dsh-desktop/   the Tauri app (Rust core + loading page)
 ```
 
-The loading page under `dsh-desktop/ui/` is the only frontend asset this client owns; it shows progress and startup errors until the harness web app loads.
+The loading page under `dsh-desktop/ui/` is the only frontend asset this client owns; it shows the app icon while starting and surfaces startup errors until the harness web app loads.
 
 ## Known Limitations and Deferred Work
 

@@ -106,7 +106,7 @@ rust/
   dsh-desktop/   the Tauri app (Rust core + loading page)
 ```
 
-`dsh-desktop/ui/` 下的加载页是本客户端唯一的自有前端资源;在 harness web 应用加载完成前,它显示进度和启动错误。
+`dsh-desktop/ui/` 下的加载页是本客户端唯一的自有前端资源;启动时它只显示应用图标,并在 harness web 应用加载完成前呈现启动错误。
 
 ## 已知限制与待办
 
