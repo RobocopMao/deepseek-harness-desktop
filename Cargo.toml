@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = ["dsh-desktop"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/deepseek-ai/deepseek-harness"
+rust-version = "1.85"
+
+[workspace.dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+url = "2.5"

@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DeepSeek Harness Desktop</title>
+  <style>
+    :root {
+      --bg: #0f1117;
+      --text: #e6e9f0;
+      --muted: #8b93a7;
+      --accent: #4f8cff;
+      --err: #ff6b6b;
+    }
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font: 14px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif;
+    }
+    .wrap {
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+    .spinner {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 3px solid var(--muted);
+      border-top-color: var(--accent);
+      animation: spin 0.9s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h1 { font-size: 17px; margin: 0; }
+    p { color: var(--muted); margin: 0; font-size: 13px; max-width: 720px; }
+    pre {
+      max-width: 760px;
+      width: 100%;
+      text-align: left;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: var(--err);
+      background: rgba(255, 107, 107, 0.08);
+      border: 1px solid var(--err);
+      border-radius: 8px;
+      padding: 12px;
+      font-size: 12px;
+    }
+    pre.log {
+      color: var(--muted);
+      background: rgba(255, 255, 255, 0.03);
+      border-color: rgba(255, 255, 255, 0.08);
+      max-height: 180px;
+      overflow-y: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div id="spinner" class="spinner"></div>
+    <h1 id="title">Starting DeepSeek Harness…</h1>
+    <p id="status">connecting…</p>
+    <pre id="log" class="log hidden"></pre>
+    <pre id="error" class="hidden"></pre>
+  </div>
+  <script>
+    const { event } = window.__TAURI__;
+    const statusEl = document.getElementById('status');
+    const logEl = document.getElementById('log');
+    const errorEl = document.getElementById('error');
+
+    event.listen('dsh-boot-status', (e) => {
+      statusEl.textContent = String(e.payload);
+    });
+    event.listen('dsh-boot-log', (e) => {
+      logEl.classList.remove('hidden');
+      logEl.textContent += String(e.payload) + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    });
+    event.listen('dsh-boot-error', (e) => {
+      document.getElementById('spinner').classList.add('hidden');
+      document.getElementById('title').textContent = 'Could not start DeepSeek Harness';
+      statusEl.textContent =
+        'Start the harness yourself (pnpm dsh web), or fix the launch configuration, then restart the client.';
+      errorEl.textContent = String(e.payload);
+      errorEl.classList.remove('hidden');
+    });
+    // Tell the Rust side the listeners are registered before it boots.
+    event.emit('loading-ready');
+  </script>
+</body>
+</html>
