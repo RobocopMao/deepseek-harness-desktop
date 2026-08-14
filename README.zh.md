@@ -1,4 +1,4 @@
-# rust/ — 桌面客户端
+# deepseek-harness-desktop — 桌面客户端
 
 [English](README.md) | 中文
 
@@ -19,7 +19,6 @@
 
 ```sh
 # from a DeepSeek Harness checkout (after pnpm install + pnpm run build)
-cd rust
 cargo run -p dsh-desktop
 ```
 
@@ -30,12 +29,12 @@ cargo run -p dsh-desktop
 发布构建就是普通 cargo 构建加上 Tauri 打包器;应用图标集位于 `dsh-desktop/icons/`,由 `app-icon.png`(1024×1024)通过 Tauri CLI 生成:
 
 ```sh
-cd rust/dsh-desktop
+cd dsh-desktop
 npx --yes @tauri-apps/cli@^2 icon app-icon.png   # regenerate the icon set
 npx --yes @tauri-apps/cli@^2 build --bundles dmg # release build + DMG
 ```
 
-DMG 输出在 `rust/target/release/bundle/dmg/`。该包未签名:在其他机器上,macOS Gatekeeper 会要求验证开发者——右键应用选择"打开",或用 Developer ID 签名并公证,才能无摩擦分发。
+DMG 输出在 `target/release/bundle/dmg/`。该包未签名:在其他机器上,macOS Gatekeeper 会要求验证开发者——右键应用选择"打开",或用 Developer ID 签名并公证,才能无摩擦分发。
 
 ## 拉取新代码后更新
 
@@ -47,18 +46,17 @@ pnpm install          # only needed when dependencies changed
 pnpm run build
 
 # 2. desktop client DMG
-cd rust/dsh-desktop
+cd dsh-desktop
 npx --yes @tauri-apps/cli@^2 build --bundles dmg
 ```
 
-安装 `rust/target/release/bundle/dmg/` 下的新 DMG。想改版本号,先编辑 `rust/dsh-desktop/tauri.conf.json` 里的 `version`。若 cargo 更新 crates.io 索引卡住,用下方排障章节里的镜像。
+安装 `target/release/bundle/dmg/` 下的新 DMG。想改版本号,先编辑 `dsh-desktop/tauri.conf.json` 里的 `version`。若 cargo 更新 crates.io 索引卡住,用下方排障章节里的镜像。
 
 ## 排障:`cargo run` 卡在 "Updating crates.io index"
 
 首次构建会把 crates.io 索引下载到 `~/.cargo`;网络不稳或被限速时,拉取可能一直挂着。当仓库内已有完整构建缓存时,可以完全跳过网络:
 
 ```sh
-cd rust
 CARGO_HOME="$PWD/.cargo-home" cargo run -p dsh-desktop
 ```
 
@@ -102,8 +100,7 @@ pnpm install
 ## 目录结构
 
 ```
-rust/
-  dsh-desktop/   the Tauri app (Rust core + loading page)
+dsh-desktop/   the Tauri app (Rust core + loading page)
 ```
 
 `dsh-desktop/ui/` 下的加载页是本客户端唯一的自有前端资源;启动时它只显示应用图标,并在 harness web 应用加载完成前呈现启动错误。

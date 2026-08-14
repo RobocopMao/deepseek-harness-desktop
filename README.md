@@ -1,4 +1,4 @@
-# rust/ — Desktop client
+# deepseek-harness-desktop — Desktop client
 
 English | [中文](README.zh.md)
 
@@ -19,7 +19,6 @@ The harness needs a build first (`pnpm run build`) and a `DEEPSEEK_API_KEY` in t
 
 ```sh
 # from a DeepSeek Harness checkout (after pnpm install + pnpm run build)
-cd rust
 cargo run -p dsh-desktop
 ```
 
@@ -32,12 +31,12 @@ set lives in `dsh-desktop/icons/` and is regenerated from `app-icon.png`
 (1024×1024) with the Tauri CLI:
 
 ```sh
-cd rust/dsh-desktop
+cd dsh-desktop
 npx --yes @tauri-apps/cli@^2 icon app-icon.png   # regenerate the icon set
 npx --yes @tauri-apps/cli@^2 build --bundles dmg # release build + DMG
 ```
 
-The DMG lands at `rust/target/release/bundle/dmg/`. The bundle is
+The DMG lands at `target/release/bundle/dmg/`. The bundle is
 unsigned: on other machines macOS Gatekeeper asks to verify the developer —
 right-click the app and choose Open, or sign with a Developer ID and
 notarize for friction-free distribution.
@@ -52,12 +51,12 @@ pnpm install          # only needed when dependencies changed
 pnpm run build
 
 # 2. desktop client DMG
-cd rust/dsh-desktop
+cd dsh-desktop
 npx --yes @tauri-apps/cli@^2 build --bundles dmg
 ```
 
-Install the fresh DMG from `rust/target/release/bundle/dmg/`. To bump the
-package version, edit `version` in `rust/dsh-desktop/tauri.conf.json` first.
+Install the fresh DMG from `target/release/bundle/dmg/`. To bump the
+package version, edit `version` in `dsh-desktop/tauri.conf.json` first.
 If cargo stalls updating the crates.io index, use the mirror in the
 troubleshooting section below.
 
@@ -68,7 +67,6 @@ throttled networks the fetch can stall. When the repository's own build cache
 is present, skip the network entirely:
 
 ```sh
-cd rust
 CARGO_HOME="$PWD/.cargo-home" cargo run -p dsh-desktop
 ```
 
@@ -120,8 +118,7 @@ The current DMG is built for Apple Silicon (`aarch64`); Intel Macs need an
 ## Layout
 
 ```
-rust/
-  dsh-desktop/   the Tauri app (Rust core + loading page)
+dsh-desktop/   the Tauri app (Rust core + loading page)
 ```
 
 The loading page under `dsh-desktop/ui/` is the only frontend asset this client owns; it shows the app icon while starting and surfaces startup errors until the harness web app loads.
