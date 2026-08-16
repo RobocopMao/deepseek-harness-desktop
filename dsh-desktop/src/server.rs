@@ -329,7 +329,9 @@ fn program_candidates(path: &Path) -> Vec<PathBuf> {
 }
 
 /// Builds the launch command; on Windows a `.cmd`/`.bat` shim must run
-/// through `cmd.exe /C`.
+/// through `cmd.exe /C`, and the child gets `CREATE_NO_WINDOW` so spawning a
+/// console program from this GUI app does not pop a console window that
+/// stays open for the harness's whole lifetime.
 fn launch_command(program: &str, args: &[String]) -> Command {
     #[cfg(windows)]
     let script = {
@@ -345,6 +347,11 @@ fn launch_command(program: &str, args: &[String]) -> Command {
     } else {
         Command::new(program)
     };
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(CommandExt::CREATE_NO_WINDOW);
+    }
     command.args(args);
     command
 }
