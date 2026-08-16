@@ -377,7 +377,9 @@ fn launch_command(program: &str, args: &[String]) -> Command {
     #[cfg(windows)]
     {
         use std::os::windows::process::CommandExt;
-        command.creation_flags(CommandExt::CREATE_NO_WINDOW);
+        // CREATE_NO_WINDOW (0x08000000): reference the value directly; the
+        // trait does not expose it as a usable constant path.
+        command.creation_flags(0x0800_0000);
     }
     command.args(args);
     command
