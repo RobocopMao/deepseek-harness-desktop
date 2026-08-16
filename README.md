@@ -94,6 +94,26 @@ Environment variables, read at startup:
 
 When the server is already running (for example `pnpm dsh web` in another terminal), the client attaches without launching anything.
 
+## Windows
+
+The client builds and runs on Windows too. Build the installer on a Windows
+machine (Tauri does not cross-compile from macOS) with the Rust MSVC
+toolchain, WebView2, and Node installed:
+
+```sh
+npx --yes @tauri-apps/cli@^2 build
+```
+
+The NSIS installer lands in `target/release/bundle/nsis/`. The repository's
+`build-installers` workflow builds the macOS DMG and the Windows installer on
+GitHub Actions for every `v*` tag (and on demand), and attaches them to the
+release, so no local Windows box is needed.
+
+Runtime requirements on Windows match macOS: a DeepSeek Harness checkout
+(`git clone` + `pnpm install`), `node`/`pnpm`, and `DEEPSEEK_API_KEY`; the
+client locates the checkout as a sibling directory or via `DSH_REPO_DIR`.
+The installer is unsigned, so SmartScreen asks to confirm the first run.
+
 ## Portability
 
 The DMG is a thin shell, not a standalone app: it hosts the harness web app

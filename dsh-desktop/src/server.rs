@@ -22,17 +22,31 @@ use url::Url;
 const MAX_LOG_LINES: usize = 100;
 /// Default how long to wait for the server to become reachable.
 const DEFAULT_START_TIMEOUT: u64 = 180;
+/// PATH entry separator.
+#[cfg(unix)]
+const PATH_SEPARATOR: char = ':';
+#[cfg(windows)]
+const PATH_SEPARATOR: char = ';';
+
 /// Extra directories searched for the launch command when it is not on PATH
-/// (Finder-launched apps inherit a minimal PATH).
+/// (GUI-launched apps inherit a minimal PATH).
+#[cfg(unix)]
 const PROGRAM_FALLBACK_DIRS: [&str; 3] = [
     "/opt/homebrew/bin",
     "/usr/local/bin",
     "~/.local/share/pnpm",
 ];
-/// Directories prepended to the launched server's PATH so a Finder-launched
+#[cfg(windows)]
+const PROGRAM_FALLBACK_DIRS: [&str; 3] = [
+    "%LOCALAPPDATA%\\pnpm",
+    "%USERPROFILE%\\scoop\\shims",
+    "%APPDATA%\\npm",
+];
+/// Directories prepended to the launched server's PATH so a GUI-launched
 /// app still finds `node`/`pnpm`: the launched program's own directory, the
 /// common package-manager and version-manager locations, then the app's own
 /// PATH as a fallback.
+#[cfg(unix)]
 const PATH_EXTRA_DIRS: [&str; 5] = [
     "~/.local/share/pnpm",
     "~/.local/share/fnm",
@@ -40,6 +54,50 @@ const PATH_EXTRA_DIRS: [&str; 5] = [
     "~/Library/pnpm",
     "/opt/homebrew/bin",
 ];
+#[cfg(windows)]
+const PATH_EXTRA_DIRS: [&str; 5] = [
+    "%LOCALAPPDATA%\\pnpm",
+    "%USERPROFILE%\\scoop\\shims",
+    "%APPDATA%\\npm",
+    "%USERPROFILE%\\.fnm",
+    "%LOCALAPPDATA%\\fnm_multishell",
+];
+
+/// The user home directory.
+#[cfg(unix)]
+fn home_dir() -> Option<String> {
+    std::env::var("HOME").ok()
+}
+#[cfg(windows)]
+fn home_dir() -> Option<String> {
+    std::env::var("USERPROFILE").ok()
+}
+
+/// Expands a directory template: `~` to the home dir on unix, `%VAR%` to the
+/// environment variable on Windows.
+#[cfg(unix)]
+fn expand_dir(template: &str, home: &str) -> String {
+    template.replace('~', home)
+}
+#[cfg(windows)]
+fn expand_dir(template: &str, _home: &str) -> String {
+    let mut out = String::new();
+    let mut rest = template;
+    while let Some(start) = rest.find('%') {
+        out.push_str(&rest[..start]);
+        rest = &rest[start + 1..];
+        if let Some(end) = rest.find('%') {
+            out.push_str(&std::env::var(&rest[..end]).unwrap_or_default());
+            rest = &rest[end + 1..];
+        } else {
+            out.push('%');
+            out.push_str(rest);
+            rest = "";
+        }
+    }
+    out.push_str(rest);
+    out
+}
 
 /// The harness web app URL, from `DSH_WEB_URL` or the well-known default.
 pub fn web_url() -> Url {
@@ -136,6 +194,7 @@ fn walk_up_to_repo(start: &Path) -> Option<PathBuf> {
 /// Scans common home locations for the checkout: `~/deepseek-harness` and
 /// `~/<projects>/*/deepseek-harness` for each of the usual project
 /// directories.
+#[cfg(unix)]
 fn scan_home_for_repo(home: &Path) -> Option<PathBuf> {
     for top in ["deepseek-harness", "Projects", "projects", "dev", "code", "src", "workspace", "work"] {
         let base = home.join(top);
@@ -150,6 +209,20 @@ fn scan_home_for_repo(home: &Path) -> Option<PathBuf> {
                     return Some(nested);
                 }
             }
+        }
+    }
+    None
+}
+
+/// Windows: the checkout usually lives directly under the profile or under a
+/// `dev`/`code`/`src`/`Projects` directory.
+#[cfg(windows)]
+fn scan_home_for_repo(home: &Path) -> Option<PathBuf> {
+    for top in ["deepseek-harness", "dev", "code", "src", "Projects", "workspace"] {
+        let base = home.join(top);
+        let direct = base.join("deepseek-harness");
+        if is_repo_root(&direct) {
+            return Some(direct);
         }
     }
     None
@@ -175,30 +248,69 @@ fn resolve_repo_dir() -> Option<PathBuf> {
             return Some(dir);
         }
     }
-    std::env::var("HOME").ok().map(PathBuf::from).and_then(|home| scan_home_for_repo(&home))
+    home_dir().map(PathBuf::from).and_then(|home| scan_home_for_repo(&home))
 }
 
 /// Locates `name` on PATH (or among [`PROGRAM_FALLBACK_DIRS`]); a name with a
-/// path separator is used as-is.
+/// path separator is used as-is. On Windows, `node`/`pnpm` usually surface as
+/// `.exe` or `.cmd` shims, so each candidate directory is tried with those
+/// extensions.
 fn resolve_program(name: &str) -> Option<String> {
-    if name.contains('/') {
+    if name.contains('/') || name.contains('\\') {
         return Path::new(name).is_file().then(|| name.to_string());
     }
     let mut candidates: Vec<PathBuf> = Vec::new();
     if let Some(path) = env_or("PATH") {
-        candidates.extend(path.split(':').map(PathBuf::from));
+        candidates.extend(path.split(PATH_SEPARATOR).map(PathBuf::from));
     }
-    let home = std::env::var("HOME").unwrap_or_default();
+    let home = home_dir().unwrap_or_default();
     for dir in PROGRAM_FALLBACK_DIRS {
-        candidates.push(PathBuf::from(dir.replace('~', &home)));
+        candidates.push(PathBuf::from(expand_dir(dir, &home)));
     }
     for dir in candidates {
-        let candidate = dir.join(name);
-        if candidate.is_file() {
-            return Some(candidate.to_string_lossy().into_owned());
+        for candidate in program_candidates(&dir.join(name)) {
+            if candidate.is_file() {
+                return Some(candidate.to_string_lossy().into_owned());
+            }
         }
     }
     None
+}
+
+/// Executable-name candidates for one PATH directory entry.
+#[cfg(unix)]
+fn program_candidates(path: &Path) -> Vec<PathBuf> {
+    vec![path.to_path_buf()]
+}
+#[cfg(windows)]
+fn program_candidates(path: &Path) -> Vec<PathBuf> {
+    vec![
+        path.with_extension("exe"),
+        path.with_extension("cmd"),
+        path.with_extension("bat"),
+        path.to_path_buf(),
+    ]
+}
+
+/// Builds the launch command; on Windows a `.cmd`/`.bat` shim must run
+/// through `cmd.exe /C`.
+fn launch_command(program: &str, args: &[String]) -> Command {
+    #[cfg(windows)]
+    let script = {
+        let lower = program.to_lowercase();
+        lower.ends_with(".cmd") || lower.ends_with(".bat")
+    };
+    #[cfg(not(windows))]
+    let script = false;
+    let mut command = if script {
+        let mut command = Command::new("cmd");
+        command.arg("/C").arg(program);
+        command
+    } else {
+        Command::new(program)
+    };
+    command.args(args);
+    command
 }
 
 fn spawn_log_reader(stream: impl Read + Send + 'static, handle: AppHandle, log: ServerLog) {
@@ -220,7 +332,7 @@ fn spawn_log_reader(stream: impl Read + Send + 'static, handle: AppHandle, log: 
 /// (`~/.nvm/versions/node/*/bin`, fnm), then the app's own PATH as a
 /// fallback. Deduplicated, order-preserving.
 fn augmented_path(resolved_program: &str) -> String {
-    let home = std::env::var("HOME").unwrap_or_default();
+    let home = home_dir().unwrap_or_default();
     let mut dirs: Vec<String> = Vec::new();
     let mut push = |dir: String| {
         if !dir.is_empty() && !dirs.contains(&dir) {
@@ -231,8 +343,9 @@ fn augmented_path(resolved_program: &str) -> String {
         push(dir.to_string_lossy().into_owned());
     }
     for dir in PATH_EXTRA_DIRS {
-        push(dir.replace('~', &home));
+        push(expand_dir(dir, &home));
     }
+    #[cfg(unix)]
     for version_dir in [
         format!("{home}/.nvm/versions/node"),
         format!("{home}/.local/share/fnm/node-versions"),
@@ -251,11 +364,11 @@ fn augmented_path(resolved_program: &str) -> String {
         }
     }
     if let Some(path) = env_or("PATH") {
-        for dir in path.split(':') {
+        for dir in path.split(PATH_SEPARATOR) {
             push(dir.to_string());
         }
     }
-    dirs.join(":")
+    dirs.join(&PATH_SEPARATOR.to_string())
 }
 
 /// Launches the harness web server on the port of `url`. The command comes
@@ -288,8 +401,7 @@ fn spawn_harness(handle: &AppHandle, log: &ServerLog, url: &Url) -> Result<Child
          Launch the app from the checkout directory, or set DSH_REPO_DIR to its path."
             .to_string()
     })?;
-    let mut command = Command::new(&program);
-    command.args(&argv[1..]);
+    let mut command = launch_command(&program, &argv[1..]);
     command.stdin(Stdio::null());
     command.stdout(Stdio::piped());
     command.stderr(Stdio::piped());

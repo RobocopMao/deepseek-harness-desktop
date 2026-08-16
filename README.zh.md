@@ -83,6 +83,18 @@ registry = "sparse+https://rsproxy.cn/index/"
 
 当服务器已在运行(例如在另一个终端里执行了 `pnpm dsh web`),客户端直接附着,不启动任何东西。
 
+## Windows
+
+客户端同样支持 Windows 构建和运行。安装器需要在 Windows 机器上构建(Tauri 不支持从 macOS 交叉编译),需要 Rust MSVC 工具链、WebView2 和 Node:
+
+```sh
+npx --yes @tauri-apps/cli@^2 build
+```
+
+NSIS 安装器输出在 `target/release/bundle/nsis/`。仓库自带的 `build-installers` 工作流会在每次打 `v*` 标签(以及手动触发)时,在 GitHub Actions 上构建 macOS DMG 和 Windows 安装器并挂到 Release,因此不需要本地 Windows 机器。
+
+Windows 上的运行要求和 macOS 一致:需要 DeepSeek Harness 检出目录(`git clone` + `pnpm install`)、`node`/`pnpm` 和 `DEEPSEEK_API_KEY`;客户端通过兄弟目录或 `DSH_REPO_DIR` 定位检出目录。安装器未签名,首次运行时 SmartScreen 会要求确认。
+
 ## 可移植性
 
 DMG 是薄外壳而不是独立应用:它承载 harness web 应用,并在需要时从**同一台机器**上的 DeepSeek Harness 检出目录启动 `pnpm dsh web`。因此在另一台 Mac 上,需要一次性准备:
