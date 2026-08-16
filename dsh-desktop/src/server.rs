@@ -137,16 +137,20 @@ fn env_or(name: &str) -> Option<String> {
 }
 
 /// Shared capture of the launched server's stdout and stderr: keeps a tail
-/// for error messages and streams every line to the loading page.
+/// for error messages, streams every line to the loading page, and appends
+/// every line to a disk log so harness-side failures are inspectable after
+/// the UI has loaded.
 #[derive(Clone)]
 struct ServerLog {
     lines: Arc<Mutex<VecDeque<String>>>,
+    file: Arc<Mutex<Option<std::fs::File>>>,
 }
 
 impl ServerLog {
     fn new() -> Self {
         Self {
             lines: Arc::new(Mutex::new(VecDeque::new())),
+            file: Arc::new(Mutex::new(open_log_file().ok())),
         }
     }
 
@@ -158,6 +162,12 @@ impl ServerLog {
             }
             guard.push_back(line.clone());
         }
+        if let Ok(mut guard) = self.file.lock() {
+            if let Some(file) = guard.as_mut() {
+                use std::io::Write;
+                let _ = writeln!(file, "{line}");
+            }
+        }
         let _ = handle.emit("dsh-boot-log", line);
     }
 
@@ -165,6 +175,23 @@ impl ServerLog {
         let guard = self.lines.lock().unwrap();
         guard.iter().cloned().collect()
     }
+}
+
+/// The harness output log path, next to the client config.
+fn log_path() -> PathBuf {
+    config_path()
+        .parent()
+        .map(|dir| dir.join("harness.log"))
+        .unwrap_or_else(|| PathBuf::from("harness.log"))
+}
+
+/// Opens the harness log for appending, creating the parent directory.
+fn open_log_file() -> Result<std::fs::File, std::io::Error> {
+    let path = log_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    std::fs::OpenOptions::new().create(true).append(true).open(path)
 }
 
 /// Whether `path` is a DeepSeek Harness checkout root.
