@@ -5,12 +5,21 @@ on:
     tags: ["v*"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     strategy:
       fail-fast: false
       matrix:
-        os: [macos-latest, windows-latest]
+        include:
+          - os: macos-latest
+            files: target/release/bundle/dmg/*.dmg
+          - os: windows-latest
+            files: |
+              target/release/bundle/nsis/*.exe
+              target/release/bundle/msi/*.msi
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -31,16 +40,10 @@ jobs:
         with:
           name: installer-${{ matrix.os }}
           if-no-files-found: warn
-          path: |
-            target/release/bundle/dmg/*.dmg
-            target/release/bundle/nsis/*.exe
-            target/release/bundle/msi/*.msi
+          path: ${{ matrix.files }}
 
-      - name: Attach to release (tags only)
+      - name: Attach installer to release (tags only)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            target/release/bundle/dmg/*.dmg
-            target/release/bundle/nsis/*.exe
-            target/release/bundle/msi/*.msi
+          files: ${{ matrix.files }}
