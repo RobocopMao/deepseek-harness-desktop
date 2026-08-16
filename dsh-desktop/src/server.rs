@@ -168,8 +168,41 @@ impl ServerLog {
 }
 
 /// Whether `path` is a DeepSeek Harness checkout root.
-fn is_repo_root(path: &Path) -> bool {
+pub fn is_repo_root(path: &Path) -> bool {
     path.join("pnpm-workspace.yaml").is_file()
+}
+
+/// The persisted client configuration path. Holds settings that cannot be
+/// auto-detected, notably the harness checkout location for layouts where no
+/// heuristic can find it (for example the client and the checkout on
+/// different drives).
+pub fn config_path() -> PathBuf {
+    #[cfg(windows)]
+    let base = std::env::var("APPDATA").map(PathBuf::from).unwrap_or_default();
+    #[cfg(not(windows))]
+    let base = home_dir()
+        .map(|home| PathBuf::from(home).join("Library").join("Application Support"))
+        .unwrap_or_default();
+    base.join("ai.deepseek.harness.desktop").join("config.json")
+}
+
+/// Reads the persisted `repo_dir` from a config file, when present and still
+/// a checkout root.
+fn read_repo_config_from(path: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(path).ok()?;
+    let value: serde_json::Value = serde_json::from_str(&text).ok()?;
+    let dir = value.get("repo_dir")?.as_str()?;
+    let dir = PathBuf::from(dir);
+    is_repo_root(&dir).then_some(dir)
+}
+
+/// Persists the checkout root so future launches can find it.
+pub fn write_repo_config(path: &Path, repo_dir: &Path) -> Result<(), String> {
+    let parent = path.parent().ok_or("the config path has no parent directory")?;
+    std::fs::create_dir_all(parent).map_err(|error| format!("failed to create the config directory: {error}"))?;
+    let json = serde_json::json!({ "repo_dir": repo_dir.to_string_lossy() });
+    let text = serde_json::to_string_pretty(&json).map_err(|error| format!("failed to serialize the config: {error}"))?;
+    std::fs::write(path, text).map_err(|error| format!("failed to write the config: {error}"))
 }
 
 /// Walks up from `start` (at most 8 levels); at each level checks the
@@ -239,6 +272,9 @@ fn resolve_repo_dir() -> Option<PathBuf> {
         if is_repo_root(&dir) {
             return Some(dir);
         }
+    }
+    if let Some(dir) = read_repo_config_from(&config_path()) {
+        return Some(dir);
     }
     if let Some(dir) = std::env::current_dir().ok().and_then(|cwd| walk_up_to_repo(&cwd)) {
         return Some(dir);
@@ -612,5 +648,21 @@ mod tests {
         let resolved = scan_home_for_repo(&home).expect("nested checkout must be found");
         assert_eq!(resolved, checkout);
         std::fs::remove_dir_all(&home).expect("fake home must be removable");
+    }
+
+    #[test]
+    fn repo_config_round_trips_and_rejects_broken_checkouts() {
+        let manifest = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let layout = manifest.join(".tmp-config");
+        let checkout = layout.join("deepseek-harness");
+        std::fs::create_dir_all(&checkout).expect("fake checkout must be creatable");
+        std::fs::write(checkout.join("pnpm-workspace.yaml"), "").expect("marker must be writable");
+        let config = layout.join("config.json");
+        write_repo_config(&config, &checkout).expect("config must be writable");
+        assert_eq!(read_repo_config_from(&config), Some(checkout.clone()));
+        // A vanished checkout root is rejected.
+        std::fs::remove_file(checkout.join("pnpm-workspace.yaml")).expect("marker must be removable");
+        assert_eq!(read_repo_config_from(&config), None);
+        std::fs::remove_dir_all(&layout).expect("fake layout must be removable");
     }
 }

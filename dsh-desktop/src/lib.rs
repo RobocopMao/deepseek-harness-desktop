@@ -6,6 +6,7 @@
 //! not), then navigates the webview to `http://127.0.0.1:3080/`. The spawned
 //! server process is reaped when the app exits.
 
+mod commands;
 mod server;
 
 use std::time::Duration;
@@ -15,6 +16,7 @@ use tauri::Listener;
 pub fn run() {
     tauri::Builder::default()
         .manage(server::ServerState::default())
+        .invoke_handler(tauri::generate_handler![commands::set_repo_dir])
         .setup(|app| {
             let handle = app.handle().clone();
             // The loading page signals that its event listeners are

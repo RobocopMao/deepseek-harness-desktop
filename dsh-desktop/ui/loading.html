@@ -10,6 +10,9 @@
       --text: #e6e9f0;
       --muted: #8b93a7;
       --err: #ff6b6b;
+      --accent: #4f8cff;
+      --panel: #161a23;
+      --border: #2a3040;
     }
     * { box-sizing: border-box; }
     html, body {
@@ -49,6 +52,44 @@
       padding: 12px;
       font-size: 12px;
     }
+    .repo-form {
+      max-width: 760px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      text-align: left;
+    }
+    .repo-form label {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .repo-form .row {
+      display: flex;
+      gap: 8px;
+    }
+    .repo-form input {
+      flex: 1;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      padding: 8px 10px;
+      font-size: 13px;
+    }
+    .repo-form input:focus { outline: none; border-color: var(--accent); }
+    .repo-form button {
+      background: var(--accent);
+      border: 1px solid var(--accent);
+      color: #fff;
+      border-radius: 6px;
+      padding: 8px 14px;
+      cursor: pointer;
+      font-size: 13px;
+      white-space: nowrap;
+    }
+    .repo-form button:hover { filter: brightness(1.1); }
+    .repo-form .status { color: var(--muted); font-size: 12px; min-height: 18px; }
     .hidden { display: none; }
   </style>
 </head>
@@ -59,6 +100,14 @@
       <h1>Could not start DeepSeek Harness</h1>
       <p>Start the harness yourself (pnpm dsh web), or fix the launch configuration, then restart the client.</p>
       <pre id="error"></pre>
+      <div class="repo-form">
+        <label for="repo-path">Harness checkout path (saved for next launches)</label>
+        <div class="row">
+          <input id="repo-path" type="text" placeholder="e.g. E:\deepseek-harness" />
+          <button id="save-repo" type="button">Save &amp; retry</button>
+        </div>
+        <div id="repo-status" class="status"></div>
+      </div>
     </div>
   </div>
   <script>
@@ -67,6 +116,21 @@
       document.getElementById('icon').classList.add('hidden');
       document.getElementById('error').textContent = String(e.payload);
       document.getElementById('error-block').classList.remove('hidden');
+    });
+    document.getElementById('save-repo').addEventListener('click', async () => {
+      const path = document.getElementById('repo-path').value.trim();
+      const status = document.getElementById('repo-status');
+      if (!path) {
+        status.textContent = 'Enter the checkout path first.';
+        return;
+      }
+      status.textContent = 'Saving…';
+      try {
+        await window.__TAURI__.core.invoke('set_repo_dir', { path });
+        // The page reloads and the boot sequence restarts.
+      } catch (error) {
+        status.textContent = String(error);
+      }
     });
     // Tell the Rust side the listeners are registered before it boots.
     event.emit('loading-ready');

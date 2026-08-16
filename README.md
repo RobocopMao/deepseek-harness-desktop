@@ -89,7 +89,7 @@ Environment variables, read at startup:
 |---|---|---|
 | `DSH_WEB_URL` | `http://127.0.0.1:3080` | The harness web app URL to attach to. |
 | `DSH_WEB_COMMAND` | `pnpm dsh web --port <url port>` | Whitespace-split argv used to launch the server when nothing is listening. The default injects the target URL's port so the server listens where the client probes; a custom command is used verbatim. |
-| `DSH_REPO_DIR` | auto-detected | Working directory for the launched server. When unset, the checkout is found by walking up from the working directory and the executable, then by scanning common home locations. |
+| `DSH_REPO_DIR` | auto-detected | Working directory for the launched server. When unset, the checkout is found from the persisted config, by walking up from the working directory and the executable, then by scanning common home locations. |
 | `DSH_WEB_START_TIMEOUT_SECS` | `180` | How long to wait for the server to become reachable. |
 
 When the server is already running (for example `pnpm dsh web` in another terminal), the client attaches without launching anything.
@@ -111,8 +111,12 @@ release, so no local Windows box is needed.
 
 Runtime requirements on Windows match macOS: a DeepSeek Harness checkout
 (`git clone` + `pnpm install`), `node`/`pnpm`, and `DEEPSEEK_API_KEY`; the
-client locates the checkout as a sibling directory or via `DSH_REPO_DIR`.
-The installer is unsigned, so SmartScreen asks to confirm the first run.
+client locates the checkout as a sibling directory, via `DSH_REPO_DIR`, or
+from its config file. When auto-detection cannot find the checkout (for
+example the client and the checkout are on different drives), enter the
+checkout path in the startup error screen and choose "Save & retry": the
+path is persisted and used on every later launch. The installer is
+unsigned, so SmartScreen asks to confirm the first run.
 
 ## Portability
 

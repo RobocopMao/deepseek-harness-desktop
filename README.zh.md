@@ -78,7 +78,7 @@ registry = "sparse+https://rsproxy.cn/index/"
 |---|---|---|
 | `DSH_WEB_URL` | `http://127.0.0.1:3080` | 要附着的 harness web 应用地址。 |
 | `DSH_WEB_COMMAND` | `pnpm dsh web --port <url 端口>` | 没有服务监听时,用于启动服务器的按空白拆分的 argv。默认命令会注入目标 URL 的端口,让服务器在客户端探测的位置监听;自定义命令原样使用。 |
-| `DSH_REPO_DIR` | 自动检测 | 启动服务器时的工作目录。未设置时,依次从当前工作目录、可执行文件路径向上查找,再扫描常见家目录位置来定位检出目录。 |
+| `DSH_REPO_DIR` | 自动检测 | 启动服务器时的工作目录。未设置时,依次从持久化配置、当前工作目录、可执行文件路径向上查找,再扫描常见家目录位置来定位检出目录。 |
 | `DSH_WEB_START_TIMEOUT_SECS` | `180` | 等待服务器可达的秒数。 |
 
 当服务器已在运行(例如在另一个终端里执行了 `pnpm dsh web`),客户端直接附着,不启动任何东西。
@@ -93,7 +93,7 @@ npx --yes @tauri-apps/cli@^2 build
 
 NSIS 安装器输出在 `target/release/bundle/nsis/`。仓库自带的 `build-installers` 工作流会在每次打 `v*` 标签(以及手动触发)时,在 GitHub Actions 上构建 macOS DMG 和 Windows 安装器并挂到 Release,因此不需要本地 Windows 机器。
 
-Windows 上的运行要求和 macOS 一致:需要 DeepSeek Harness 检出目录(`git clone` + `pnpm install`)、`node`/`pnpm` 和 `DEEPSEEK_API_KEY`;客户端通过兄弟目录或 `DSH_REPO_DIR` 定位检出目录。安装器未签名,首次运行时 SmartScreen 会要求确认。
+Windows 上的运行要求和 macOS 一致:需要 DeepSeek Harness 检出目录(`git clone` + `pnpm install`)、`node`/`pnpm` 和 `DEEPSEEK_API_KEY`;客户端通过兄弟目录、`DSH_REPO_DIR` 或配置文件定位检出目录。当自动检测找不到检出目录时(例如客户端和检出目录在不同盘),在启动错误页输入检出路径并点"Save & retry":路径会被持久化,之后每次启动都生效。安装器未签名,首次运行时 SmartScreen 会要求确认。
 
 ## 可移植性
 
