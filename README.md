@@ -9,7 +9,7 @@ A minimal [Tauri](https://tauri.app) desktop client for DeepSeek Harness. It is 
 On startup the client makes sure the harness web server is reachable, then hands the webview over to it:
 
 1. Probes the web app URL (`http://127.0.0.1:3080/` by default).
-2. When nothing is listening, launches the harness server (`pnpm dsh web --port <target port>`, i.e. `dsh --profile web`) and waits until it accepts connections.
+2. When nothing is listening, launches the harness server (`pnpm dsh web --no-open --port <target port>`, i.e. `dsh --profile web`) and waits until it accepts connections. `--no-open` stops the server from handing its URL to the default browser: the webview is the client's own window, so a second browser tab would only duplicate it.
 3. Navigates the webview to the URL. All product UI comes from the harness itself — the browser window and the server lifecycle are all this client owns.
 4. On exit, reaps the server process it spawned. A server you started yourself is left untouched.
 
@@ -88,7 +88,7 @@ Environment variables, read at startup:
 | Variable | Default | Meaning |
 |---|---|---|
 | `DSH_WEB_URL` | `http://127.0.0.1:3080` | The harness web app URL to attach to. |
-| `DSH_WEB_COMMAND` | `pnpm dsh web --port <url port>` | Whitespace-split argv used to launch the server when nothing is listening. The default injects the target URL's port so the server listens where the client probes; a custom command is used verbatim. |
+| `DSH_WEB_COMMAND` | `pnpm dsh web --no-open --port <url port>` | Whitespace-split argv used to launch the server when nothing is listening. The default injects the target URL's port so the server listens where the client probes, and passes `--no-open` so the spawned server does not pop the default browser (this client's webview is the window); a custom command is used verbatim. |
 | `DSH_REPO_DIR` | auto-detected | Working directory for the launched server. When unset, the checkout is found from the persisted config, by walking up from the working directory and the executable, then by scanning common home locations. |
 | `DSH_WEB_START_TIMEOUT_SECS` | `180` | How long to wait for the server to become reachable. |
 

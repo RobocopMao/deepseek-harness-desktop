@@ -443,18 +443,33 @@ fn augmented_path(resolved_program: &str) -> String {
     dirs.join(&PATH_SEPARATOR.to_string())
 }
 
+/// The default harness launch command: `pnpm dsh web --no-open --port <port>`.
+/// `--no-open` keeps the spawned server from handing its canonical URL to the
+/// default browser — this client hosts the web app in its own webview, so a
+/// second window would only duplicate it. The port is injected from `url` so
+/// the server listens exactly where the client probes.
+fn default_web_command(url: &Url) -> Vec<String> {
+    let port = url.port_or_known_default().unwrap_or(80).to_string();
+    vec![
+        "pnpm".into(),
+        "dsh".into(),
+        "web".into(),
+        "--no-open".into(),
+        "--port".into(),
+        port,
+    ]
+}
+
 /// Launches the harness web server on the port of `url`. The command comes
 /// from `DSH_WEB_COMMAND` (whitespace-split argv) or defaults to
-/// `pnpm dsh web --port <port>`, so the spawned server listens exactly where
-/// the app probes; the working directory comes from [`resolve_repo_dir`].
-/// Server output is captured and streamed to the loading page.
+/// [`default_web_command`], so the spawned server listens exactly where
+/// the app probes and does not open a system browser; the working directory
+/// comes from [`resolve_repo_dir`]. Server output is captured and streamed to
+/// the loading page.
 fn spawn_harness(handle: &AppHandle, log: &ServerLog, url: &Url) -> Result<Child, String> {
     let argv: Vec<String> = match env_or("DSH_WEB_COMMAND") {
         Some(command) => command.split_whitespace().map(str::to_string).collect(),
-        None => {
-            let port = url.port_or_known_default().unwrap_or(80).to_string();
-            vec!["pnpm".into(), "dsh".into(), "web".into(), "--port".into(), port]
-        }
+        None => default_web_command(url),
     };
     if argv.is_empty() {
         return Err("DSH_WEB_COMMAND must not be empty".into());
@@ -610,6 +625,22 @@ mod tests {
         // for the variable it touches.
         unsafe { std::env::remove_var("DSH_WEB_URL") };
         assert_eq!(web_url().as_str(), "http://127.0.0.1:3080/");
+    }
+
+    #[test]
+    fn default_web_command_suppresses_the_browser_and_matches_the_url_port() {
+        let url = Url::parse("http://127.0.0.1:3080/").expect("static URL");
+        assert_eq!(
+            default_web_command(&url),
+            vec!["pnpm", "dsh", "web", "--no-open", "--port", "3080"]
+        );
+        // A URL without an explicit port falls back to the scheme default,
+        // the same port the probe would connect to.
+        let default_port = Url::parse("http://127.0.0.1/").expect("static URL");
+        assert_eq!(
+            default_web_command(&default_port),
+            vec!["pnpm", "dsh", "web", "--no-open", "--port", "80"]
+        );
     }
 
     #[test]

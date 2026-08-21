@@ -9,7 +9,7 @@
 启动时,客户端确保 harness web 服务器可达,然后把 webview 交给它:
 
 1. 探测 web 应用地址(默认为 `http://127.0.0.1:3080/`)。
-2. 没有服务在监听时,启动 harness 服务器(`pnpm dsh web --port <目标端口>`,即 `dsh --profile web`),等待其接受连接。
+2. 没有服务在监听时,启动 harness 服务器(`pnpm dsh web --no-open --port <目标端口>`,即 `dsh --profile web`),等待其接受连接。`--no-open` 让服务器不再把 URL 交给系统默认浏览器:webview 就是客户端自己的窗口,再弹一个浏览器标签页只会重复。
 3. 将 webview 导航到该地址。所有产品 UI 都来自 harness 本身——本客户端只拥有浏览器窗口和服务器生命周期。
 4. 退出时回收它启动的服务器进程;你自己启动的服务器保持不动。
 
@@ -77,7 +77,7 @@ registry = "sparse+https://rsproxy.cn/index/"
 | 变量 | 默认值 | 含义 |
 |---|---|---|
 | `DSH_WEB_URL` | `http://127.0.0.1:3080` | 要附着的 harness web 应用地址。 |
-| `DSH_WEB_COMMAND` | `pnpm dsh web --port <url 端口>` | 没有服务监听时,用于启动服务器的按空白拆分的 argv。默认命令会注入目标 URL 的端口,让服务器在客户端探测的位置监听;自定义命令原样使用。 |
+| `DSH_WEB_COMMAND` | `pnpm dsh web --no-open --port <url 端口>` | 没有服务监听时,用于启动服务器的按空白拆分的 argv。默认命令会注入目标 URL 的端口让服务器在客户端探测的位置监听,并附加 `--no-open` 让服务器不再弹出系统默认浏览器(webview 就是客户端自己的窗口);自定义命令原样使用。 |
 | `DSH_REPO_DIR` | 自动检测 | 启动服务器时的工作目录。未设置时,依次从持久化配置、当前工作目录、可执行文件路径向上查找,再扫描常见家目录位置来定位检出目录。 |
 | `DSH_WEB_START_TIMEOUT_SECS` | `180` | 等待服务器可达的秒数。 |
 
