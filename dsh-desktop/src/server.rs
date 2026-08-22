@@ -600,17 +600,24 @@ pub fn kill_child(handle: &AppHandle) {
         // orphaning the node process that actually hosts the server — which
         // would keep serving the web app after the client exits. `taskkill
         // /T` terminates the whole tree, the equivalent of the SIGKILL that
-        // reaches the host process directly on macOS/Linux.
+        // reaches the host process directly on macOS/Linux. CREATE_NO_WINDOW
+        // keeps the console taskkill process from flashing a shell window
+        // when spawned from this GUI app (the same flag `launch_command`
+        // uses for the harness process).
         #[cfg(windows)]
-        let _ = Command::new("taskkill")
-            .arg("/PID")
-            .arg(child.id().to_string())
-            .arg("/T")
-            .arg("/F")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
+        {
+            use std::os::windows::process::CommandExt;
+            let _ = Command::new("taskkill")
+                .creation_flags(0x0800_0000) // CREATE_NO_WINDOW
+                .arg("/PID")
+                .arg(child.id().to_string())
+                .arg("/T")
+                .arg("/F")
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .status();
+        }
         #[cfg(not(windows))]
         let _ = child.kill();
         let _ = child.wait();
