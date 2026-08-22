@@ -22,10 +22,19 @@ use tauri::Listener;
 use url::Url;
 
 /// Whether `url` belongs to this client's own surface: the bundled loading
-/// page (the `tauri://` scheme used by [`tauri::WebviewUrl::App`]) or the
-/// harness web app origin. Every other URL is external.
+/// page (the Tauri custom protocol) or the harness web app origin. Every
+/// other URL is external.
+///
+/// The custom protocol that serves the embedded assets has a different
+/// identity per platform: `tauri://localhost` on macOS and Linux, but the
+/// `http(s)://tauri.localhost` workaround on Windows and Android — see
+/// `Manager::tauri_protocol_url` in the tauri crate. Treating the Windows
+/// form as external was a regression: the loading page would be handed to
+/// the system browser at startup.
 fn is_client_url(url: &Url, app: &Url) -> bool {
     url.scheme() == "tauri"
+        || url.host_str() == Some("tauri.localhost")
+        || (cfg!(dev) && url.host_str() == Some("localhost"))
         || (url.scheme() == app.scheme()
             && url.host_str() == app.host_str()
             && url.port_or_known_default() == app.port_or_known_default())
@@ -103,9 +112,16 @@ mod tests {
     #[test]
     fn client_urls_are_internal_but_external_links_are_not() {
         let app = Url::parse("http://127.0.0.1:3080/").expect("static URL");
-        // The bundled loading page uses the tauri:// scheme.
+        // The bundled loading page uses the tauri:// scheme on macOS/Linux…
         assert!(is_client_url(
             &Url::parse("tauri://localhost/loading.html").expect("static URL"),
+            &app
+        ));
+        // …and the http://tauri.localhost workaround on Windows/Android. A
+        // regression here opened the loading page in the system browser at
+        // startup on Windows.
+        assert!(is_client_url(
+            &Url::parse("http://tauri.localhost/loading.html").expect("static URL"),
             &app
         ));
         // The harness web app origin, including deep routes.
