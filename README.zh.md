@@ -10,7 +10,7 @@
 
 1. 探测 web 应用地址(默认为 `http://127.0.0.1:3080/`)。
 2. 没有服务在监听时,启动 harness 服务器(`pnpm dsh web --no-open --port <目标端口>`,即 `dsh --profile web`),等待其接受连接。`--no-open` 让服务器不再把 URL 交给系统默认浏览器:webview 就是客户端自己的窗口,再弹一个浏览器标签页只会重复。
-3. 将 webview 导航到该地址。所有产品 UI 都来自 harness 本身——本客户端只拥有浏览器窗口和服务器生命周期。
+3. 将 webview 导航到该地址。所有产品 UI 都来自 harness 本身——本客户端只拥有浏览器窗口和服务器生命周期。外壳还负责链接路由:任何会让 webview 离开应用的链接——聊天消息里的外部 URL、`target="_blank"` 锚点、`mailto:`——都会改由系统默认浏览器打开,客户端自身不会离开 harness 界面。
 4. 退出时回收它启动的服务器进程;你自己启动的服务器保持不动。
 
 和终端里运行 `pnpm dsh web` 一样,harness 需要先构建(`pnpm run build`),环境里需要有 `DEEPSEEK_API_KEY`。

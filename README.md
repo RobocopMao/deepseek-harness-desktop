@@ -10,7 +10,7 @@ On startup the client makes sure the harness web server is reachable, then hands
 
 1. Probes the web app URL (`http://127.0.0.1:3080/` by default).
 2. When nothing is listening, launches the harness server (`pnpm dsh web --no-open --port <target port>`, i.e. `dsh --profile web`) and waits until it accepts connections. `--no-open` stops the server from handing its URL to the default browser: the webview is the client's own window, so a second browser tab would only duplicate it.
-3. Navigates the webview to the URL. All product UI comes from the harness itself — the browser window and the server lifecycle are all this client owns.
+3. Navigates the webview to the URL. All product UI comes from the harness itself — the browser window and the server lifecycle are all this client owns. The shell also routes links: anything that would take the webview away from the app — an external URL in a chat message, a `target="_blank"` anchor, a `mailto:` — is opened in the system default browser instead, so the client never leaves the harness UI.
 4. On exit, reaps the server process it spawned. A server you started yourself is left untouched.
 
 The harness needs a build first (`pnpm run build`) and a `DEEPSEEK_API_KEY` in the environment, exactly as when running `pnpm dsh web` from a terminal.
