@@ -52,7 +52,6 @@ pub fn run() {
                 let _ = ready_tx.send(());
             });
             let app_url = server::web_url();
-            let app_url_for_new_window = app_url.clone();
             tauri::WebviewWindowBuilder::new(
                 app,
                 "main",
